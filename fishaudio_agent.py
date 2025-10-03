@@ -80,48 +80,7 @@ async def entrypoint(ctx: JobContext):
 
     @session.on("metrics_collected")
     def _on_metrics_collected(ev: MetricsCollectedEvent):
-        # Log each metric with detailed timing information
-        for metric in ev.metrics:
-            if metric.type == "stt_metrics":
-                logger.info(
-                    f"📝 STT Metrics | "
-                    f"Duration: {metric.duration:.3f}s | "
-                    f"Audio Duration: {metric.audio_duration:.3f}s | "
-                    f"Streamed: {metric.streamed}"
-                )
-            elif metric.type == "llm_metrics":
-                logger.info(
-                    f"🧠 LLM Metrics | "
-                    f"TTFT: {metric.ttft:.3f}s | "
-                    f"Duration: {metric.duration:.3f}s | "
-                    f"Tokens/sec: {metric.tokens_per_second:.1f} | "
-                    f"Total Tokens: {metric.total_tokens} | "
-                    f"Cancelled: {metric.cancelled}"
-                )
-            elif metric.type == "tts_metrics":
-                logger.info(
-                    f"🔊 TTS Metrics | "
-                    f"TTFB: {metric.ttfb:.3f}s | "
-                    f"Duration: {metric.duration:.3f}s | "
-                    f"Audio Duration: {metric.audio_duration:.3f}s | "
-                    f"Characters: {metric.characters_count} | "
-                    f"Cancelled: {metric.cancelled}"
-                )
-            elif metric.type == "eou_metrics":
-                total_latency = (
-                    metric.end_of_utterance_delay +
-                    metric.transcription_delay +
-                    metric.on_user_turn_completed_delay
-                )
-                logger.info(
-                    f"⚡ EOU Metrics | "
-                    f"EOU Delay: {metric.end_of_utterance_delay:.3f}s | "
-                    f"Transcription Delay: {metric.transcription_delay:.3f}s | "
-                    f"Turn Completed Delay: {metric.on_user_turn_completed_delay:.3f}s | "
-                    f"Total: {total_latency:.3f}s"
-                )
-
-        # Collect metrics for usage summary
+        metrics.log_metrics(ev.metrics)
         usage_collector.collect(ev.metrics)
 
     async def log_usage():
