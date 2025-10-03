@@ -59,7 +59,7 @@ async def entrypoint(ctx: JobContext):
         vad=silero.VAD.load(),
         stt=openai.STT(
                 model="gpt-4o-mini-transcribe",
-                language="ja"),
+                language="ja", use_realtime=True),
         llm=openai.LLM(
                 model="gpt-5",
                 reasoning_effort="minimal",
