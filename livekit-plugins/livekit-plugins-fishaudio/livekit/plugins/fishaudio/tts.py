@@ -1,4 +1,3 @@
-import asyncio
 import os
 import uuid
 from dataclasses import dataclass
@@ -16,8 +15,6 @@ FISHAUDIO_API_KEY = os.getenv("FISHAUDIO_API_KEY")
 SAMPLE_RATE = 24000
 NUM_CHANNELS = 1
 MIME_TYPE = "audio/wav"
-
-_STREAM_END = object()
 
 
 @dataclass
@@ -88,42 +85,23 @@ class ChunkedStream(tts.ChunkedStream):
                 temperature=self._opts.temperature,
                 top_p=self._opts.top_p,
             )
+            # fish-audio-sdk is sync, so run in thread
+            import asyncio
+
+            loop = asyncio.get_running_loop()
+
+            def run_tts():
+                return list(self._ws.tts(tts_request, [], backend="s1"))
+
+            audio_chunks = await loop.run_in_executor(None, run_tts)
             output_emitter.initialize(
                 request_id=request_id,
                 sample_rate=SAMPLE_RATE,
                 num_channels=NUM_CHANNELS,
                 mime_type=MIME_TYPE,
             )
-
-            queue: asyncio.Queue = asyncio.Queue()
-            loop = asyncio.get_running_loop()
-
-            def run_tts():
-                try:
-                    for chunk in self._ws.tts(tts_request, [], backend="s1"):
-                        loop.call_soon_threadsafe(queue.put_nowait, chunk)
-                except Exception as exc:  # surface errors back to async loop
-                    loop.call_soon_threadsafe(queue.put_nowait, exc)
-                finally:
-                    loop.call_soon_threadsafe(queue.put_nowait, _STREAM_END)
-
-            producer_future = loop.run_in_executor(None, run_tts)
-
-            pending_error: Exception | None = None
-            while True:
-                item = await queue.get()
-                if item is _STREAM_END:
-                    break
-                if isinstance(item, Exception):
-                    pending_error = item
-                    break
-                output_emitter.push(item)
-
-            await producer_future
-
-            if pending_error:
-                raise pending_error
-
+            for chunk in audio_chunks:
+                output_emitter.push(chunk)
             output_emitter.flush()
         except Exception as e:
             raise APIConnectionError() from e
